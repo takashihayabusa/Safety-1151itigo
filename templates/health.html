@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>健康チェック</title>
+
+<style>
+
+body{
+font-family:sans-serif;
+background:#f4f8ff;
+padding:20px;
+}
+
+.card{
+background:white;
+padding:20px;
+border-radius:10px;
+max-width:400px;
+margin:auto;
+box-shadow:0 4px 10px rgba(0,0,0,0.1);
+}
+
+button{
+padding:10px;
+margin:5px;
+width:100%;
+font-size:16px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="card">
+
+<h2>健康チェック</h2>
+
+<form action="/send" method="post">
+
+<p>名前</p>
+<input name="name" required>
+
+<p>今日の体調はどうですか？</p>
+
+<label><input type="radio" name="health" value="良い" required> 良い</label><br>
+<label><input type="radio" name="health" value="普通"> 普通</label><br>
+<label><input type="radio" name="health" value="少し悪い"> 少し悪い</label><br>
+<label><input type="radio" name="health" value="悪い"> 悪い</label>
+
+<p>今日は元気ですか？</p>
+
+<label><input type="radio" name="genki" value="元気です" required> 元気です</label><br>
+<label><input type="radio" name="genki" value="まあまあです"> まあまあです</label><br>
+<label><input type="radio" name="genki" value="少しつらい"> 少しつらい</label><br>
+<label><input type="radio" name="genki" value="かなりつらい"> かなりつらい</label>
+
+<p>理由（任意）</p>
+
+<textarea name="reason"></textarea>
+
+<br><br>
+
+<button type="submit">送信</button>
+
+</form>
+
+</div>
+
+</body>
+</html>
