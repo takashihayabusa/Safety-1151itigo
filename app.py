@@ -1,175 +1,158 @@
 from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler
-from linebot.models import (
-    MessageEvent, TextMessage, TextSendMessage,
-    TemplateSendMessage, ButtonsTemplate, MessageAction,
-    LocationMessage
-)
+from linebot.models import *
 from linebot.exceptions import InvalidSignatureError
-import datetime
+
 import os
+import datetime
+from openpyxl import Workbook, load_workbook
 
 app = Flask(__name__)
 
-CHANNEL_ACCESS_TOKEN = "G+WVfBYA61JkTqXM+r1/Y3HlksAxH2sq8lm/Zm2ifIr6agVcr339zAbjUfmZSp5tkyB97l0pG681K7hGtUnbmXnV2CyG8O7t/dTDhoA9CJI94aftXczCEfFwmWTTEu3tdLWNDWiHH7lzrW4uPX0UOgdB04t89/1O/w1cDnyilFU="
-CHANNEL_SECRET = "ab06793a22d874528049156bf4de7dc8"
+# =====================
+# LINE設定
+# =====================
+CHANNEL_ACCESS_TOKEN = "ここにアクセストークン"
+CHANNEL_SECRET = "ここにシークレット"
 
 line_bot_api = LineBotApi(CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(CHANNEL_SECRET)
 
+# =====================
+# ログ保存
+# =====================
+def save_log(user_id, action):
+    file_name = "action_log.xlsx"
 
-# 🔹CSV保存（列分割＋ヘッダー付き）
-def save_to_csv(name, text, lat="", lon=""):
+    if not os.path.exists(file_name):
+        wb = Workbook()
+        ws = wb.active
+        ws.append(["日時", "ユーザーID", "内容"])
+        wb.save(file_name)
 
-    file_exists = os.path.isfile("log.csv")
+    wb = load_workbook(file_name)
+    ws = wb.active
+
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    ws.append([now, user_id, action])
 
-    with open("log.csv", "a", encoding="utf-8-sig") as f:
+    wb.save(file_name)
 
-        if not file_exists:
-            f.write("日時,名前,内容,緯度,経度\n")
-
-        f.write(f"{now},{name},{text},{lat},{lon}\n")
-
+# =====================
+# 起動確認
+# =====================
 @app.route("/")
 def index():
-    return "生存確認BOT（完全版・CSV改善）"
+    return "生存確認BOT起動中"
 
-
-@app.route("/callback", methods=["POST"])
+# =====================
+# Webhook
+# =====================
+@app.route("/callback", methods=['POST'])
 def callback():
-    signature = request.headers.get("X-Line-Signature", "")
+    signature = request.headers['X-Line-Signature']
     body = request.get_data(as_text=True)
 
     try:
         handler.handle(body, signature)
     except InvalidSignatureError:
         abort(400)
-    except Exception as e:
-        print("エラー:", e)
-        abort(500)
 
     return "OK"
 
-
-# 🔥 テキスト処理
+# =====================
+# テキスト処理
+# =====================
 @handler.add(MessageEvent, message=TextMessage)
-def handle_text(event):
-
+def handle_message(event):
     text = event.message.text
     user_id = event.source.user_id
 
-    # 🔹名前取得（安全）
-    try:
-        profile = line_bot_api.get_profile(user_id)
-        name = profile.display_name
-    except:
-        name = user_id
+    # 全ログ
+    save_log(user_id, f"受信: {text}")
 
-    # 🔹CSV保存（テキスト）
-    save_to_csv(name, text)
-
-    # ▼はい
+    # =====================
+    # はい
+    # =====================
     if text == "はい":
+        save_log(user_id, "元気（はい）")
+
         line_bot_api.reply_message(
             event.reply_token,
-            TextSendMessage(text="安心しました😊")
+            TextSendMessage(text="安心しました。無理せず頑張ってください")
         )
 
-    # ▼いいえ（最強誘導）
+    # =====================
+    # いいえ
+    # =====================
     elif text == "いいえ":
-        line_bot_api.reply_message(
-            event.reply_token,
-            TextSendMessage(
-                text=(
-                    "⚠️大丈夫ですか？\n\n"
-                    "📍現在地を送ってください\n\n"
-                    "【送り方】\n"
-                    "① 文字入力を閉じる（キーボードを消す）\n"
-                    "② 左下の『＋』ボタンを押す\n"
-                    "③『位置情報』を選ぶ\n"
-                    "④ そのまま送信ボタンを押す\n\n"
-                    "※わからなければ『わからない』と送ってください"
-                )
+        save_log(user_id, "いいえ選択")
+
+        message = TemplateSendMessage(
+            alt_text="位置情報確認",
+            template=ButtonsTemplate(
+                text="よかったら位置情報を教えてください",
+                actions=[
+                    MessageAction(label="送る", text="位置送信"),
+                    MessageAction(label="送らない", text="送らない")
+                ]
             )
         )
 
-    # ▼位置説明
-    elif text == "位置":
+        line_bot_api.reply_message(event.reply_token, message)
+
+    # =====================
+    # 送る
+    # =====================
+    elif text == "位置送信":
+        save_log(user_id, "位置送信選択")
+
         line_bot_api.reply_message(
             event.reply_token,
             TextSendMessage(
-                text=(
-                    "📍【位置情報の送り方】\n\n"
-                    "① 文字入力を閉じる（キーボードを消す）\n"
-                    "② 左下の『＋』を押す\n"
-                    "③『位置情報』を押す\n"
-                    "④ 地図が出たら送信ボタンを押す\n\n"
-                    "これで現在地が送れます"
-                )
-            )
-        )
-
-    # ▼サポート
-    elif text == "わからない":
-        line_bot_api.reply_message(
-            event.reply_token,
-            TextSendMessage(
-                text=(
-                    "📱画面の左下に『＋』ボタンがあります\n"
-                    "キーボードを消すと見えるようになります"
-                )
-            )
-        )
-
-    # ▼その他（ボタン表示）
-    else:
-        line_bot_api.reply_message(
-            event.reply_token,
-            TemplateSendMessage(
-                alt_text="生存確認",
-                template=ButtonsTemplate(
-                    text="元気ですか？",
-                    actions=[
-                        MessageAction(label="はい", text="はい"),
-                        MessageAction(label="いいえ", text="いいえ"),
-                        MessageAction(label="📍位置の送り方", text="位置")
+                text="位置情報の送信方法：\n①下のボタンを押す\n②位置情報を許可\n③そのまま送信してください",
+                quick_reply=QuickReply(
+                    items=[
+                        QuickReplyButton(
+                            action=LocationAction(label="位置情報を送る")
+                        )
                     ]
                 )
             )
         )
 
+    # =====================
+    # 送らない
+    # =====================
+    elif text == "送らない":
+        save_log(user_id, "送信拒否")
 
-# 🔥 GPS処理
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text="無理をせずに休んでください")
+        )
+
+    # =====================
+    # その他
+    # =====================
+    else:
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text="メッセージを受け取りました")
+        )
+
+# =====================
+# 位置情報処理
+# =====================
 @handler.add(MessageEvent, message=LocationMessage)
 def handle_location(event):
-
     user_id = event.source.user_id
     lat = event.message.latitude
     lon = event.message.longitude
 
-    # 🔹名前取得
-    try:
-        profile = line_bot_api.get_profile(user_id)
-        name = profile.display_name
-    except:
-        name = user_id
-
-    # 🔹CSV保存（位置）
-    save_to_csv(name, "位置送信", lat, lon)
-
-    map_url = f"https://www.google.com/maps?q={lat},{lon}"
+    save_log(user_id, f"位置情報: {lat},{lon}")
 
     line_bot_api.reply_message(
         event.reply_token,
-        TextSendMessage(
-            text=(
-                "📍位置を受信しました\n"
-                f"{map_url}"
-            )
-        )
+        TextSendMessage(text="位置情報を受け取りました。ありがとうございます。")
     )
-
-
-if __name__ == "__main__":
-    app.run()
