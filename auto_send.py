@@ -4,7 +4,7 @@ import datetime
 import time
 
 # =====================
-# LINE設定（app.pyと同じもの）
+# LINE設定
 # =====================
 CHANNEL_ACCESS_TOKEN = "G+WVfBYA61JkTqXM+r1/Y3HlksAxH2sq8lm/Zm2ifIr6agVcr339zAbjUfmZSp5tkyB97l0pG681K7hGtUnbmXnV2CyG8O7t/dTDhoA9CJI94aftXczCEfFwmWTTEu3tdLWNDWiHH7lzrW4uPX0UOgdB04t89/1O/w1cDnyilFU="
 USER_ID = "U6b88cd42924581ac141db052cc09eb08"
@@ -12,50 +12,35 @@ USER_ID = "U6b88cd42924581ac141db052cc09eb08"
 line_bot_api = LineBotApi(CHANNEL_ACCESS_TOKEN)
 
 # =====================
-# 時間設定（ここだけ変更）
+# 時間設定
 # =====================
-SEND_HOUR = 14
-SEND_MINUTE = 42
+SEND_HOUR = 16
+SEND_MINUTE = 6
 
 # =====================
-# 送信処理
+# 送信関数（★先に書く）
 # =====================
 def send_message():
     try:
-        message = "テスト送信"
+        message = "【自動送信】元気ですか？"
         line_bot_api.push_message(USER_ID, TextSendMessage(text=message))
         print("送信成功")
-
     except Exception as e:
-        print("＝＝＝＝エラー発生＝＝＝＝")
-        print(e)
-        print("＝＝＝＝ここまで＝＝＝＝")
+        print("エラー:", e)
+
 # =====================
-# スケジューラ
+# メイン処理（後）
 # =====================
-print("自動送信スタート")
-
-print("自動送信スタート")
-
-send_message()  # ←これ追加（即送信テスト）
-
-
-last_sent = None
-
 print("自動送信スタート")
 
 while True:
-    now = datetime.datetime.now()
+    now = datetime.datetime.utcnow() + datetime.timedelta(hours=9)
 
-    # ★現在時刻表示（必須）
-    print(f"現在: {now.strftime('%H:%M:%S')} / 設定: {SEND_HOUR}:{SEND_MINUTE}")
+    print(f"今の時間: {now.strftime('%H:%M:%S')}")
 
-    if now.hour == SEND_HOUR and now.minute >= SEND_MINUTE:
-        print("時間条件OK")
-
-        if last_sent != now.strftime("%Y-%m-%d"):
-            print("送信実行！")
-            send_message()
-            last_sent = now.strftime("%Y-%m-%d")
+    if now.hour == SEND_HOUR and now.minute == SEND_MINUTE:
+        print("時間一致！！！")
+        send_message()
+        time.sleep(60)
 
     time.sleep(5)
