@@ -6,6 +6,8 @@ from linebot.models import (
     LocationMessage
 )
 from linebot.exceptions import InvalidSignatureError
+import datetime
+import os
 
 app = Flask(__name__)
 
@@ -16,20 +18,36 @@ line_bot_api = LineBotApi(CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(CHANNEL_SECRET)
 
 
+# 🔹CSV保存（列分割＋ヘッダー付き）
+def save_to_csv(name, text, lat="", lon=""):
+
+    file_exists = os.path.isfile("log.csv")
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    with open("log.csv", "a", encoding="utf-8-sig") as f:
+
+        if not file_exists:
+            f.write("日時,名前,内容,緯度,経度\n")
+
+        f.write(f"{now},{name},{text},{lat},{lon}\n")
+
 @app.route("/")
 def index():
-    return "生存確認BOT（最終完成版）"
+    return "生存確認BOT（完全版・CSV改善）"
 
 
 @app.route("/callback", methods=["POST"])
 def callback():
-    signature = request.headers["X-Line-Signature"]
+    signature = request.headers.get("X-Line-Signature", "")
     body = request.get_data(as_text=True)
 
     try:
         handler.handle(body, signature)
     except InvalidSignatureError:
         abort(400)
+    except Exception as e:
+        print("エラー:", e)
+        abort(500)
 
     return "OK"
 
@@ -39,6 +57,17 @@ def callback():
 def handle_text(event):
 
     text = event.message.text
+    user_id = event.source.user_id
+
+    # 🔹名前取得（安全）
+    try:
+        profile = line_bot_api.get_profile(user_id)
+        name = profile.display_name
+    except:
+        name = user_id
+
+    # 🔹CSV保存（テキスト）
+    save_to_csv(name, text)
 
     # ▼はい
     if text == "はい":
@@ -47,7 +76,7 @@ def handle_text(event):
             TextSendMessage(text="安心しました😊")
         )
 
-    # ▼いいえ（完全誘導版）
+    # ▼いいえ（最強誘導）
     elif text == "いいえ":
         line_bot_api.reply_message(
             event.reply_token,
@@ -65,7 +94,7 @@ def handle_text(event):
             )
         )
 
-    # ▼位置説明（さらに丁寧）
+    # ▼位置説明
     elif text == "位置":
         line_bot_api.reply_message(
             event.reply_token,
@@ -87,7 +116,7 @@ def handle_text(event):
             event.reply_token,
             TextSendMessage(
                 text=(
-                    "📱画面の左下に『＋』があります\n"
+                    "📱画面の左下に『＋』ボタンがあります\n"
                     "キーボードを消すと見えるようになります"
                 )
             )
@@ -111,12 +140,23 @@ def handle_text(event):
         )
 
 
-# 🔥 GPS処理（地図リンク付き）
+# 🔥 GPS処理
 @handler.add(MessageEvent, message=LocationMessage)
 def handle_location(event):
 
+    user_id = event.source.user_id
     lat = event.message.latitude
     lon = event.message.longitude
+
+    # 🔹名前取得
+    try:
+        profile = line_bot_api.get_profile(user_id)
+        name = profile.display_name
+    except:
+        name = user_id
+
+    # 🔹CSV保存（位置）
+    save_to_csv(name, "位置送信", lat, lon)
 
     map_url = f"https://www.google.com/maps?q={lat},{lon}"
 
